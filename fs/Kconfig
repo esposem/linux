@@ -221,6 +221,12 @@ config MEMFD_CREATE
 config ARCH_HAS_GIGANTIC_PAGE
 	bool
 
+config STATS_FS
+	bool "Statistics Filesystem"
+	help
+	  stats_fs is a virtual file system that provides counters and
+	  other statistics about the running kernel.
+
 source "fs/configfs/Kconfig"
 source "fs/efivarfs/Kconfig"
 
