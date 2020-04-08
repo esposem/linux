@@ -88,6 +88,18 @@ struct statsfs_source {
 struct statsfs_source *statsfs_source_create(const char *fmt, ...);
 
 /**
+ * statsfs_source_register - register a source in the statsfs filesystem
+ * @source: a pointer to the source that will be registered
+ *
+ * TAdd the given folder as direct child of /sys/kernel/statsfs.
+ * It also starts to recursively search its own child and create all folders
+ * and files if they weren't already. All subsequent add_subordinate calls
+ * on the same source that is used in this function will create corresponding
+ * files and directories.
+ */
+void statsfs_source_register(struct statsfs_source *source);
+
+/**
  * statsfs_source_add_values - adds values to the given source
  * @source: a pointer to the source that will receive the values
  * @val: a pointer to the NULL terminated statsfs_value array to add

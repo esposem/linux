@@ -17,14 +17,112 @@ struct statsfs_aggregate_value {
 	uint32_t count, count_zero;
 };
 
+static void statsfs_source_remove_files(struct statsfs_source *src);
+
 static int is_val_signed(struct statsfs_value *val)
 {
 	return val->type & STATSFS_SIGN;
 }
 
+static int statsfs_attr_get(void *data, u64 *val)
+{
+	int r = -EFAULT;
+	struct statsfs_data_inode *val_inode =
+		(struct statsfs_data_inode *)data;
+
+	r = statsfs_source_get_value(val_inode->src, val_inode->val, val);
+	return r;
+}
+
+static int statsfs_attr_clear(void *data, u64 val)
+{
+	int r = -EFAULT;
+	struct statsfs_data_inode *val_inode =
+		(struct statsfs_data_inode *)data;
+
+	if (val)
+		return -EINVAL;
+
+	r = statsfs_source_clear(val_inode->src, val_inode->val);
+	return r;
+}
+
 int statsfs_val_get_mode(struct statsfs_value *val)
 {
 	return val->mode ? val->mode : 0644;
+}
+
+static int statsfs_attr_data_open(struct inode *inode, struct file *file)
+{
+	struct statsfs_data_inode *val_inode;
+	char *fmt;
+
+	val_inode = (struct statsfs_data_inode *)inode->i_private;
+
+	/* Inodes hold a  pointer to the source which is not included in the
+	 * refcount, so they files be opened while destroy is running, but
+	 * values are removed (base_addr = NULL) before the source is destroyed.
+	 */
+	if (!kref_get_unless_zero(&val_inode->src->refcount))
+		return -ENOENT;
+
+	if (is_val_signed(val_inode->val))
+		fmt = "%lld\n";
+	else
+		fmt = "%llu\n";
+
+	if (simple_attr_open(inode, file, statsfs_attr_get,
+			     statsfs_val_get_mode(val_inode->val) & 0222 ?
+				     statsfs_attr_clear :
+				     NULL,
+			     fmt)) {
+		statsfs_source_put(val_inode->src);
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+static int statsfs_attr_release(struct inode *inode, struct file *file)
+{
+	struct statsfs_data_inode *val_inode;
+
+	val_inode = (struct statsfs_data_inode *)inode->i_private;
+
+	simple_attr_release(inode, file);
+	statsfs_source_put(val_inode->src);
+
+	return 0;
+}
+
+const struct file_operations statsfs_ops = {
+	.owner = THIS_MODULE,
+	.open = statsfs_attr_data_open,
+	.release = statsfs_attr_release,
+	.read = simple_attr_read,
+	.write = simple_attr_write,
+	.llseek = no_llseek,
+};
+
+/* Called with rwsem held for writing */
+static void statsfs_source_remove_files_locked(struct statsfs_source *src)
+{
+	struct statsfs_source *child;
+
+	if (src->source_dentry == NULL)
+		return;
+
+	list_for_each_entry(child, &src->subordinates_head, list_element)
+		statsfs_source_remove_files(child);
+
+	statsfs_remove_recursive(src->source_dentry);
+	src->source_dentry = NULL;
+}
+
+static void statsfs_source_remove_files(struct statsfs_source *src)
+{
+	down_write(&src->rwsem);
+	statsfs_source_remove_files_locked(src);
+	up_write(&src->rwsem);
 }
 
 static struct statsfs_value *find_value(struct statsfs_value_source *src,
@@ -58,6 +156,61 @@ search_value_in_source(struct statsfs_source *src, struct statsfs_value *arg,
 
 	return NULL;
 }
+
+/* Called with rwsem held for writing */
+static void statsfs_create_files_locked(struct statsfs_source *source)
+{
+	struct statsfs_value_source *val_src;
+	struct statsfs_value *val;
+
+	if (!source->source_dentry)
+		return;
+
+	list_for_each_entry(val_src, &source->values_head, list_element) {
+		if (val_src->files_created)
+			continue;
+
+		for (val = val_src->values; val->name; val++)
+			statsfs_create_file(val, source);
+
+		val_src->files_created = true;
+	}
+}
+
+/* Called with rwsem held for writing */
+static void statsfs_create_files_recursive_locked(struct statsfs_source *source,
+						  struct dentry *parent_dentry)
+{
+	struct statsfs_source *child;
+
+	/* first check values in this folder, since it might be new */
+	if (!source->source_dentry) {
+		source->source_dentry =
+			statsfs_create_dir(source->name, parent_dentry);
+	}
+
+	statsfs_create_files_locked(source);
+
+	list_for_each_entry(child, &source->subordinates_head, list_element) {
+		if (child->source_dentry == NULL) {
+			/* assume that if child has a folder,
+			 * also the sub-child have that.
+			 */
+			down_write(&child->rwsem);
+			statsfs_create_files_recursive_locked(
+				child, source->source_dentry);
+			up_write(&child->rwsem);
+		}
+	}
+}
+
+void statsfs_source_register(struct statsfs_source *source)
+{
+	down_write(&source->rwsem);
+	statsfs_create_files_recursive_locked(source, NULL);
+	up_write(&source->rwsem);
+}
+EXPORT_SYMBOL_GPL(statsfs_source_register);
 
 /* Called with rwsem held for writing */
 static struct statsfs_value_source *create_value_source(void *base)
@@ -96,6 +249,9 @@ int statsfs_source_add_values(struct statsfs_source *source,
 	/* add the val_src to the source list */
 	list_add(&val_src->list_element, &source->values_head);
 
+	/* create child if it's the case */
+	statsfs_create_files_locked(source);
+
 	up_write(&source->rwsem);
 
 	return 0;
@@ -109,6 +265,10 @@ void statsfs_source_add_subordinate(struct statsfs_source *source,
 
 	statsfs_source_get(sub);
 	list_add(&sub->list_element, &source->subordinates_head);
+	if (source->source_dentry) {
+		statsfs_create_files_recursive_locked(sub,
+						      source->source_dentry);
+	}
 
 	up_write(&source->rwsem);
 }
@@ -127,6 +287,7 @@ statsfs_source_remove_subordinate_locked(struct statsfs_source *source,
 		if (src_entry == sub) {
 			WARN_ON(strcmp(src_entry->name, sub->name) != 0);
 			list_del_init(&src_entry->list_element);
+			statsfs_source_remove_files(src_entry);
 			statsfs_source_put(src_entry);
 			return;
 		}
@@ -572,6 +733,7 @@ static void statsfs_source_destroy(struct kref *kref_source)
 		statsfs_source_remove_subordinate_locked(source, child);
 	}
 
+	statsfs_source_remove_files_locked(source);
 
 	up_write(&source->rwsem);
 	kfree(source->name);
