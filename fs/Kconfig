@@ -328,4 +328,11 @@ source "fs/unicode/Kconfig"
 config IO_WQ
 	bool
 
+config STATS_FS
+	bool "Statistics Filesystem"
+	default y
+	help
+	  statsfs is a virtual file system that provides counters and other
+	  statistics about the running kernel.
+
 endmenu
