@@ -52,6 +52,9 @@ struct stats_fs_value {
 	enum stat_aggr aggr_kind;
 
 	uint32_t value_flag;
+
+	/* optional show function */
+	char *(*show)(uint64_t);
 };
 
 struct stats_fs_source {
@@ -143,6 +146,18 @@ extern const struct stats_fs_type stats_fs_type_bool;
  */
 struct stats_fs_source *stats_fs_source_create(uint32_t flags, const char *fmt,
 					       ...);
+
+/**
+ * stats_fs_source_register - register a source in the stats_fs filesystem
+ * @source: a pointer to the source that will be registered
+ *
+ * Add the given folder as direct child of /sys/kernel/stats.
+ * It also starts to recursively search its own child and create all folders
+ * and files if they weren't already. All subsequent add_subordinate calls
+ * on the same source that is used in this function will create corresponding
+ * files and directories.
+ */
+void stats_fs_source_register(struct stats_fs_source *source);
 
 /**
  * stats_fs_source_add_values - adds values to the given source
@@ -306,6 +321,9 @@ static inline struct stats_fs_source *stats_fs_source_create(uint32_t flags,
 {
 	return ERR_PTR(-ENODEV);
 }
+
+static inline void stats_fs_source_register(struct stats_fs_source *source)
+{ }
 
 static inline int stats_fs_source_add_values(struct stats_fs_source *source,
 					     struct stats_fs_value *val,

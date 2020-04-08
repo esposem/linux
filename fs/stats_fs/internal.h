@@ -16,4 +16,19 @@ struct stats_fs_value_source {
 	struct list_head list_element;
 };
 
+struct stats_fs_data_inode {
+	struct stats_fs_source *src;
+	struct stats_fs_value *val;
+};
+
+struct dentry *stats_fs_create_file(struct stats_fs_value *val,
+				   struct stats_fs_source *src);
+
+struct dentry *stats_fs_create_dir(const char *name, struct dentry *parent);
+
+void stats_fs_remove(struct dentry *dentry);
+#define stats_fs_remove_recursive stats_fs_remove
+
+int is_val_signed(struct stats_fs_value *val);
+
 #endif /* _STATS_FS_INTERNAL_H_ */

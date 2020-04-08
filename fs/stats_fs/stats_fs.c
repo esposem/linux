@@ -39,9 +39,33 @@ STATS_FS_TYPE_STRUCT_US(32)
 STATS_FS_TYPE_STRUCT_US(64)
 STATS_FS_TYPE_STRUCT(bool)
 
-static int is_val_signed(struct stats_fs_value *val)
+static void stats_fs_source_remove_files(struct stats_fs_source *src);
+
+int is_val_signed(struct stats_fs_value *val)
 {
 	return val->type->sign;
+}
+
+/* Called with rwsem held for writing */
+static void stats_fs_source_remove_files_locked(struct stats_fs_source *src)
+{
+	struct stats_fs_source *child;
+
+	if (src->source_dentry == NULL)
+		return;
+
+	list_for_each_entry (child, &src->subordinates_head, list_element)
+		stats_fs_source_remove_files(child);
+
+	stats_fs_remove_recursive(src->source_dentry);
+	src->source_dentry = NULL;
+}
+
+static void stats_fs_source_remove_files(struct stats_fs_source *src)
+{
+	down_write(&src->rwsem);
+	stats_fs_source_remove_files_locked(src);
+	up_write(&src->rwsem);
 }
 
 static struct stats_fs_value *find_value(struct stats_fs_value_source *src,
@@ -73,6 +97,63 @@ search_value_in_source(struct stats_fs_source *src, struct stats_fs_value *arg,
 
 	return NULL;
 }
+
+/* Called with rwsem held for writing */
+static void stats_fs_create_files_locked(struct stats_fs_source *source)
+{
+	struct stats_fs_value_source *val_src;
+	struct stats_fs_value *val;
+
+	if (!source->source_dentry)
+		return;
+
+	list_for_each_entry (val_src, &source->values_head, list_element) {
+		if (val_src->files_created ||
+		    (val_src->common_flags & STATS_FS_HIDDEN))
+			continue;
+
+		for (val = val_src->values; val->name; val++)
+			stats_fs_create_file(val, source);
+
+		val_src->files_created = true;
+	}
+}
+
+/* Called with rwsem held for writing */
+static void
+stats_fs_create_files_recursive_locked(struct stats_fs_source *source,
+				       struct dentry *parent_dentry)
+{
+	struct stats_fs_source *child;
+
+	/* first check values in this folder, since it might be new */
+	if (!source->source_dentry && !(source->common_flags & STATS_FS_HIDDEN)) {
+		source->source_dentry =
+			stats_fs_create_dir(source->name, parent_dentry);
+	}
+
+	stats_fs_create_files_locked(source);
+
+	list_for_each_entry (child, &source->subordinates_head, list_element) {
+		if (child->source_dentry == NULL) {
+			/* assume that if child has a folder,
+			 * also the sub-child have that.
+			 */
+			down_write(&child->rwsem);
+			stats_fs_create_files_recursive_locked(
+				child, source->source_dentry);
+			up_write(&child->rwsem);
+		}
+	}
+}
+
+void stats_fs_source_register(struct stats_fs_source *source)
+{
+	down_write(&source->rwsem);
+	stats_fs_create_files_recursive_locked(source, NULL);
+	up_write(&source->rwsem);
+}
+EXPORT_SYMBOL_GPL(stats_fs_source_register);
 
 /* Called with rwsem held for writing */
 static struct stats_fs_value_source *create_value_source(void *base, uint32_t flags)
@@ -112,6 +193,9 @@ int stats_fs_source_add_values(struct stats_fs_source *source,
 	/* add the val_src to the source list */
 	list_add(&val_src->list_element, &source->values_head);
 
+	/* create child if it's the case */
+	stats_fs_create_files_locked(source);
+
 	up_write(&source->rwsem);
 
 	return 0;
@@ -125,6 +209,9 @@ void stats_fs_source_add_subordinate(struct stats_fs_source *source,
 
 	stats_fs_source_get(sub);
 	list_add(&sub->list_element, &source->subordinates_head);
+	if (source->source_dentry)
+		stats_fs_create_files_recursive_locked(sub,
+						       source->source_dentry);
 
 	up_write(&source->rwsem);
 }
@@ -141,6 +228,7 @@ stats_fs_source_remove_subordinate_locked(struct stats_fs_source *source,
 			     list_element) {
 		if (src_entry == sub) {
 			list_del_init(&src_entry->list_element);
+			stats_fs_source_remove_files(src_entry);
 			stats_fs_source_put(src_entry);
 			return;
 		}
@@ -504,6 +592,8 @@ static void stats_fs_source_destroy(struct kref *kref_source)
 		child = list_entry(it, struct stats_fs_source, list_element);
 		stats_fs_source_remove_subordinate_locked(source, child);
 	}
+
+	stats_fs_source_remove_files_locked(source);
 
 	up_write(&source->rwsem);
 	kfree(source->name);
