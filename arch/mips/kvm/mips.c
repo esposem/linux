@@ -39,7 +39,7 @@
 #define VECTORSPACING 0x100	/* for EI/VI mode */
 #endif
 
-struct kvm_stats_debugfs_item debugfs_entries[] = {
+struct statsfs_value statsfs_vcpu_entries[] = {
 	VCPU_STAT("wait", wait_exits),
 	VCPU_STAT("cache", cache_exits),
 	VCPU_STAT("signal", signal_exits),
