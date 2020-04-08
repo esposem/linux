@@ -190,7 +190,7 @@ static u64 __read_mostly host_xss;
 u64 __read_mostly supported_xss;
 EXPORT_SYMBOL_GPL(supported_xss);
 
-struct kvm_stats_debugfs_item debugfs_entries[] = {
+struct stats_fs_value stats_fs_vcpu_entries[] = {
 	VCPU_STAT("pf_fixed", pf_fixed),
 	VCPU_STAT("pf_guest", pf_guest),
 	VCPU_STAT("tlb_flush", tlb_flush),
@@ -217,6 +217,10 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
 	VCPU_STAT("nmi_injections", nmi_injections),
 	VCPU_STAT("req_event", req_event),
 	VCPU_STAT("l1d_flush", l1d_flush),
+	{ NULL }
+};
+
+struct stats_fs_value stats_fs_vm_entries[] = {
 	VM_STAT("mmu_shadow_zapped", mmu_shadow_zapped),
 	VM_STAT("mmu_pte_write", mmu_pte_write),
 	VM_STAT("mmu_pte_updated", mmu_pte_updated),
@@ -226,8 +230,9 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
 	VM_STAT("mmu_cache_miss", mmu_cache_miss),
 	VM_STAT("mmu_unsync", mmu_unsync),
 	VM_STAT("remote_tlb_flush", remote_tlb_flush),
-	VM_STAT("largepages", lpages, .mode = 0444),
-	VM_STAT("nx_largepages_splitted", nx_lpage_splits, .mode = 0444),
+	VM_STAT("largepages", lpages, .value_flag = STATS_FS_FLOATING_VALUE),
+	VM_STAT("nx_largepages_splitted", nx_lpage_splits,
+		.value_flag = STATS_FS_FLOATING_VALUE),
 	VM_STAT("max_mmu_page_hash_collisions", max_mmu_page_hash_collisions),
 	{ NULL }
 };
