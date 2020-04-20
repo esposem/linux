@@ -1868,15 +1868,13 @@ struct inode *proc_pid_make_inode(struct super_block * sb,
 
 	/* We need a new inode */
 
-	inode = new_inode(sb);
+	inode = new_inode_current_time(sb);
 	if (!inode)
 		goto out;
 
 	/* Common stuff */
 	ei = PROC_I(inode);
 	inode->i_mode = mode;
-	inode->i_ino = get_next_ino();
-	inode->i_mtime = inode->i_atime = inode->i_ctime = current_time(inode);
 	inode->i_op = &proc_def_inode_operations;
 
 	/*
