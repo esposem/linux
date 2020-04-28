@@ -144,22 +144,24 @@ int source_has_subsource(struct stats_fs_source *src,
 			 struct stats_fs_source *sub)
 {
 	struct stats_fs_source *entry;
+	unsigned long index;
 
-	list_for_each_entry (entry, &src->subordinates_head, list_element) {
+	xa_for_each (&src->subordinates, index, entry)
 		if (entry == sub)
 			return 1;
-	}
+
 	return 0;
 }
 
 int get_number_subsources(struct stats_fs_source *src)
 {
 	struct stats_fs_source *entry;
+	unsigned long index;
 	int counter = 0;
 
-	list_for_each_entry (entry, &src->subordinates_head, list_element) {
+	xa_for_each (&src->subordinates, index, entry)
 		counter++;
-	}
+
 	return counter;
 }
 
@@ -174,13 +176,14 @@ int get_number_values(struct stats_fs_source *src)
 int get_total_number_values(struct stats_fs_source *src)
 {
 	struct stats_fs_source *sub_entry;
+	unsigned long index;
 	int counter = 0;
 
 	get_stats_at_addr(src, NULL, NULL, &counter, 0);
 
-	list_for_each_entry (sub_entry, &src->subordinates_head, list_element) {
+	xa_for_each (&src->subordinates, index, sub_entry)
 		counter += get_total_number_values(sub_entry);
-	}
+
 
 	return counter;
 }
