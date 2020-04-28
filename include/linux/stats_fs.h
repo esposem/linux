@@ -11,6 +11,7 @@
 #define _STATS_FS_H_
 
 #include <linux/list.h>
+#include <linux/xarray.h>
 
 /* Used to distinguish signed types */
 #define STATS_FS_SIGN 0x8000
@@ -61,10 +62,8 @@ struct stats_fs_source {
 	/* list of source stats_fs_value_source*/
 	struct list_head values_head;
 
-	/* list of struct stats_fs_source for subordinate sources */
-	struct list_head subordinates_head;
-
-	struct list_head list_element;
+	/* list of subordinate sources */
+	struct xarray subordinates;
 
 	struct rw_semaphore rwsem;
 

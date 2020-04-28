@@ -107,11 +107,12 @@ const struct file_operations stats_fs_ops = {
 static void stats_fs_source_remove_files_locked(struct stats_fs_source *src)
 {
 	struct stats_fs_source *child;
+	unsigned long index;
 
 	if (src->source_dentry == NULL)
 		return;
 
-	list_for_each_entry (child, &src->subordinates_head, list_element)
+	xa_for_each (&src->subordinates, index, child)
 		stats_fs_source_remove_files(child);
 
 	stats_fs_remove_recursive(src->source_dentry);
@@ -181,6 +182,7 @@ stats_fs_create_files_recursive_locked(struct stats_fs_source *source,
 				       struct dentry *parent_dentry)
 {
 	struct stats_fs_source *child;
+	unsigned long index;
 
 	/* first check values in this folder, since it might be new */
 	if (!source->source_dentry) {
@@ -190,7 +192,7 @@ stats_fs_create_files_recursive_locked(struct stats_fs_source *source,
 
 	stats_fs_create_files_locked(source);
 
-	list_for_each_entry (child, &source->subordinates_head, list_element) {
+	xa_for_each (&source->subordinates, index, child) {
 		if (child->source_dentry == NULL) {
 			/* assume that if child has a folder,
 			 * also the sub-child have that.
@@ -259,10 +261,23 @@ EXPORT_SYMBOL_GPL(stats_fs_source_add_values);
 void stats_fs_source_add_subordinate(struct stats_fs_source *source,
 				     struct stats_fs_source *sub)
 {
+	int err;
+	uint32_t index;
+
 	down_write(&source->rwsem);
 
 	stats_fs_source_get(sub);
-	list_add(&sub->list_element, &source->subordinates_head);
+	err = __xa_alloc(&source->subordinates, &index, sub, xa_limit_32b,
+		       GFP_KERNEL);
+
+	if (err) {
+		printk(KERN_ERR "Failed to insert subordinate %s\n"
+			"Too many subordinates in source %s\n",
+			sub->name, source->name);
+		up_write(&source->rwsem);
+		return;
+	}
+
 	if (source->source_dentry)
 		stats_fs_create_files_recursive_locked(sub,
 						       source->source_dentry);
@@ -277,11 +292,11 @@ stats_fs_source_remove_subordinate_locked(struct stats_fs_source *source,
 					  struct stats_fs_source *sub)
 {
 	struct stats_fs_source *src_entry;
+	unsigned long index;
 
-	list_for_each_entry (src_entry, &source->subordinates_head,
-			     list_element) {
+	xa_for_each (&source->subordinates, index, src_entry) {
 		if (src_entry == sub) {
-			list_del_init(&src_entry->list_element);
+			xa_erase(&source->subordinates, index);
 			stats_fs_source_remove_files(src_entry);
 			stats_fs_source_put(src_entry);
 			return;
@@ -435,13 +450,13 @@ do_recursive_aggregation(struct stats_fs_source *root,
 			 struct stats_fs_aggregate_value *agg)
 {
 	struct stats_fs_source *subordinate;
+	unsigned long index;
 
 	/* search all simple values in this folder */
 	search_all_simple_values(root, ref_src_entry, val, agg);
 
 	/* recursively search in all subfolders */
-	list_for_each_entry (subordinate, &root->subordinates_head,
-			     list_element) {
+	xa_for_each (&root->subordinates, index, subordinate) {
 		down_read(&subordinate->rwsem);
 		do_recursive_aggregation(subordinate, ref_src_entry, val, agg);
 		up_read(&subordinate->rwsem);
@@ -575,13 +590,13 @@ static void do_recursive_clean(struct stats_fs_source *root,
 			       struct stats_fs_value *val)
 {
 	struct stats_fs_source *subordinate;
+	unsigned long index;
 
 	/* search all simple values in this folder */
 	set_all_simple_values(root, ref_src_entry, val);
 
 	/* recursively search in all subfolders */
-	list_for_each_entry (subordinate, &root->subordinates_head,
-			     list_element) {
+	xa_for_each (&root->subordinates, index, subordinate) {
 		down_read(&subordinate->rwsem);
 		do_recursive_clean(subordinate, ref_src_entry, val);
 		up_read(&subordinate->rwsem);
@@ -707,9 +722,10 @@ EXPORT_SYMBOL_GPL(stats_fs_source_revoke);
  */
 static void stats_fs_source_destroy(struct kref *kref_source)
 {
-	struct stats_fs_value_source *val_src_entry;
 	struct list_head *it, *safe;
+	struct stats_fs_value_source *val_src_entry;
 	struct stats_fs_source *child, *source;
+	unsigned long index;
 
 	source = container_of(kref_source, struct stats_fs_source, refcount);
 
@@ -721,15 +737,14 @@ static void stats_fs_source_destroy(struct kref *kref_source)
 	}
 
 	/* iterate through the subordinates and delete them */
-	list_for_each_safe (it, safe, &source->subordinates_head) {
-		child = list_entry(it, struct stats_fs_source, list_element);
+	xa_for_each (&source->subordinates, index, child)
 		stats_fs_source_remove_subordinate_locked(source, child);
-	}
 
 	stats_fs_source_remove_files_locked(source);
 
 	up_write(&source->rwsem);
 	kfree(source->name);
+	xa_destroy(&source->subordinates);
 	kfree(source);
 }
 
@@ -765,8 +780,7 @@ struct stats_fs_source *stats_fs_source_create(const char *fmt, ...)
 	init_rwsem(&ret->rwsem);
 
 	INIT_LIST_HEAD(&ret->values_head);
-	INIT_LIST_HEAD(&ret->subordinates_head);
-	INIT_LIST_HEAD(&ret->list_element);
+	xa_init(&ret->subordinates);
 
 	return ret;
 }
