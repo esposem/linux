@@ -89,6 +89,7 @@ Documentation for filesystem implementations.
    relay
    romfs
    squashfs
+   stats_fs
    sysfs
    sysv-fs
    tmpfs
