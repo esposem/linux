@@ -14,24 +14,25 @@
 
 struct stats_fs_value stats_fs_vcpu_tsc_offset[] = {
 	VCPU_ARCH_STATS_FS("tsc-offset", kvm_vcpu_arch, tsc_offset,
-			   .type = STATS_FS_S64, .mode = 0444),
+			   .type = &stats_fs_type_s64, .mode = 0444),
 	{ NULL }
 };
 
 struct stats_fs_value stats_fs_vcpu_arch_lapic_timer[] = {
 	VCPU_ARCH_STATS_FS("lapic_timer_advance_ns", kvm_timer, timer_advance_ns,
-			   .type = STATS_FS_U64, .mode = 0444),
+			   .type = &stats_fs_type_u64, .mode = 0444),
 	{ NULL }
 };
 
 struct stats_fs_value stats_fs_vcpu_arch_tsc_ratio[] = {
 	VCPU_ARCH_STATS_FS("tsc-scaling-ratio", kvm_vcpu_arch, tsc_scaling_ratio,
-			   .type = STATS_FS_U64, .mode = 0444),
+			   .type = &stats_fs_type_u64, .mode = 0444),
 	{ NULL }
 };
 
 struct stats_fs_value stats_fs_vcpu_arch_tsc_frac[] = {
-	{ "tsc-scaling-ratio-frac-bits", 0, .type = STATS_FS_U64, .mode = 0444 },
+	{ "tsc-scaling-ratio-frac-bits", 0, .type = &stats_fs_type_u64,
+	  .mode = 0444 },
 	{ NULL } /* base is &kvm_tsc_scaling_ratio_frac_bits */
 };
 

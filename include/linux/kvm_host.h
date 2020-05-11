@@ -1110,10 +1110,12 @@ static inline bool kvm_is_error_gpa(struct kvm *kvm, gpa_t gpa)
 	return kvm_is_error_hva(hva);
 }
 
-#define VM_STAT(n, x, ...) 													\
-	{ n, offsetof(struct kvm, stat.x), STATS_FS_U64, STATS_FS_SUM, ## __VA_ARGS__ }
-#define VCPU_STAT(n, x, ...)												\
-	{ n, offsetof(struct kvm_vcpu, stat.x), STATS_FS_U64, STATS_FS_SUM, ## __VA_ARGS__ }
+#define VM_STAT(n, x, ...) 						       \
+	{ n, offsetof(struct kvm, stat.x), &stats_fs_type_u64,	       \
+	  STATS_FS_SUM, ## __VA_ARGS__ }
+#define VCPU_STAT(n, x, ...)						       \
+	{ n, offsetof(struct kvm_vcpu, stat.x), &stats_fs_type_u64,    \
+	  STATS_FS_SUM, ## __VA_ARGS__ }
 
 extern struct stats_fs_value stats_fs_vcpu_entries[];
 extern struct stats_fs_value stats_fs_vm_entries[];
