@@ -12,21 +12,6 @@
 
 #include <linux/list.h>
 
-/* Used to distinguish signed types */
-#define STATS_FS_SIGN 0x8000
-
-enum stat_type {
-	STATS_FS_U8 = 0,
-	STATS_FS_U16 = 1,
-	STATS_FS_U32 = 2,
-	STATS_FS_U64 = 3,
-	STATS_FS_BOOL = 4,
-	STATS_FS_S8 = STATS_FS_U8 | STATS_FS_SIGN,
-	STATS_FS_S16 = STATS_FS_U16 | STATS_FS_SIGN,
-	STATS_FS_S32 = STATS_FS_U32 | STATS_FS_SIGN,
-	STATS_FS_S64 = STATS_FS_U64 | STATS_FS_SIGN,
-};
-
 enum stat_aggr {
 	STATS_FS_NONE = 0,
 	STATS_FS_SUM,
@@ -34,6 +19,14 @@ enum stat_aggr {
 	STATS_FS_MAX,
 	STATS_FS_COUNT_ZERO,
 	STATS_FS_AVG,
+};
+
+struct stats_fs_value;
+
+struct stats_fs_type {
+	uint64_t (*get)(struct stats_fs_value *, void *);
+	void (*clear)(struct stats_fs_value *, void *);
+	bool sign;
 };
 
 struct stats_fs_value {
@@ -44,7 +37,7 @@ struct stats_fs_value {
 	int offset;
 
 	/* Type of the stat BOOL,U64,... */
-	enum stat_type type;
+	struct stats_fs_type *type;
 
 	/* Aggregate type: MIN, MAX, SUM,... */
 	enum stat_aggr aggr_kind;
@@ -70,6 +63,45 @@ struct stats_fs_source {
 
 	struct dentry *source_dentry;
 };
+
+#define STATS_FS_DEFINE_GET(name, type)	         			       \
+	static inline uint64_t stats_fs_get_##name(struct stats_fs_value *val, \
+						   void *base)                 \
+	{                                                                      \
+		return *((type *)(base + (uintptr_t)val->offset));   	       \
+	}
+
+#define STATS_FS_DEFINE_SET(name, type)                                        \
+	static inline void stats_fs_set_##name(struct stats_fs_value *val,     \
+						   void *base)                 \
+	{                                                                      \
+		*((type *)(base + (uintptr_t)val->offset)) = 0;                \
+	}
+
+#define STATS_FS_DEFINE_F_US(len)					       \
+	STATS_FS_DEFINE_GET(u##len, u##len)				       \
+	STATS_FS_DEFINE_GET(s##len, s##len)				       \
+	STATS_FS_DEFINE_SET(len, u##len)
+
+#define STATS_FS_DEFINE_F(len)						       \
+	STATS_FS_DEFINE_GET(len, len)					       \
+	STATS_FS_DEFINE_SET(len, len)
+
+STATS_FS_DEFINE_F_US(8)
+STATS_FS_DEFINE_F_US(16)
+STATS_FS_DEFINE_F_US(32)
+STATS_FS_DEFINE_F_US(64)
+STATS_FS_DEFINE_F(bool)
+
+extern struct stats_fs_type stats_fs_type_u8;
+extern struct stats_fs_type stats_fs_type_s8;
+extern struct stats_fs_type stats_fs_type_u16;
+extern struct stats_fs_type stats_fs_type_s16;
+extern struct stats_fs_type stats_fs_type_u32;
+extern struct stats_fs_type stats_fs_type_s32;
+extern struct stats_fs_type stats_fs_type_u64;
+extern struct stats_fs_type stats_fs_type_s64;
+extern struct stats_fs_type stats_fs_type_bool;
 
 #if defined(CONFIG_STATS_FS)
 

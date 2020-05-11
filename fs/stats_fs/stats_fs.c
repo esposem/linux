@@ -17,11 +17,33 @@ struct stats_fs_aggregate_value {
 	uint32_t count, count_zero;
 };
 
+#define STATS_FS_DEFINE_TYPE_STRUCT(gtype, stype, si)                          \
+	struct stats_fs_type stats_fs_type_##gtype =			       \
+		{                                                              \
+			.get = stats_fs_get_##gtype,			       \
+			.clear = stats_fs_set_##stype,      		       \
+			.sign = si,                                            \
+		};							       \
+	EXPORT_SYMBOL_GPL(stats_fs_type_##gtype);
+
+#define STATS_FS_TYPE_STRUCT_US(len)				               \
+	STATS_FS_DEFINE_TYPE_STRUCT(u##len, len, 0)			       \
+	STATS_FS_DEFINE_TYPE_STRUCT(s##len, len, 1)
+
+#define STATS_FS_TYPE_STRUCT(type)				               \
+	STATS_FS_DEFINE_TYPE_STRUCT(type, type, 0)
+
+STATS_FS_TYPE_STRUCT_US(8)
+STATS_FS_TYPE_STRUCT_US(16)
+STATS_FS_TYPE_STRUCT_US(32)
+STATS_FS_TYPE_STRUCT_US(64)
+STATS_FS_TYPE_STRUCT(bool)
+
 static void stats_fs_source_remove_files(struct stats_fs_source *src);
 
 static int is_val_signed(struct stats_fs_value *val)
 {
-	return val->type & STATS_FS_SIGN;
+	return val->type.sign;
 }
 
 static int stats_fs_attr_get(void *data, u64 *val)
@@ -302,86 +324,9 @@ EXPORT_SYMBOL_GPL(stats_fs_source_remove_subordinate);
 static uint64_t get_simple_value(struct stats_fs_value_source *src,
 				 struct stats_fs_value *val)
 {
-	uint64_t value_found;
-	void *address;
-
-	address = src->base_addr + val->offset;
-
-	switch (val->type) {
-	case STATS_FS_U8:
-		value_found = *((uint8_t *)address);
-		break;
-	case STATS_FS_U8 | STATS_FS_SIGN:
-		value_found = *((int8_t *)address);
-		break;
-	case STATS_FS_U16:
-		value_found = *((uint16_t *)address);
-		break;
-	case STATS_FS_U16 | STATS_FS_SIGN:
-		value_found = *((int16_t *)address);
-		break;
-	case STATS_FS_U32:
-		value_found = *((uint32_t *)address);
-		break;
-	case STATS_FS_U32 | STATS_FS_SIGN:
-		value_found = *((int32_t *)address);
-		break;
-	case STATS_FS_U64:
-		value_found = *((uint64_t *)address);
-		break;
-	case STATS_FS_U64 | STATS_FS_SIGN:
-		value_found = *((int64_t *)address);
-		break;
-	case STATS_FS_BOOL:
-		value_found = *((uint8_t *)address);
-		break;
-	default:
-		value_found = 0;
-		break;
-	}
-
-	return value_found;
-}
-
-/* Called with rwsem held for reading */
-static void clear_simple_value(struct stats_fs_value_source *src,
-			       struct stats_fs_value *val)
-{
-	void *address;
-
-	address = src->base_addr + val->offset;
-
-	switch (val->type) {
-	case STATS_FS_U8:
-		*((uint8_t *)address) = 0;
-		break;
-	case STATS_FS_U8 | STATS_FS_SIGN:
-		*((int8_t *)address) = 0;
-		break;
-	case STATS_FS_U16:
-		*((uint16_t *)address) = 0;
-		break;
-	case STATS_FS_U16 | STATS_FS_SIGN:
-		*((int16_t *)address) = 0;
-		break;
-	case STATS_FS_U32:
-		*((uint32_t *)address) = 0;
-		break;
-	case STATS_FS_U32 | STATS_FS_SIGN:
-		*((int32_t *)address) = 0;
-		break;
-	case STATS_FS_U64:
-		*((uint64_t *)address) = 0;
-		break;
-	case STATS_FS_U64 | STATS_FS_SIGN:
-		*((int64_t *)address) = 0;
-		break;
-	case STATS_FS_BOOL:
-		*((uint8_t *)address) = 0;
-		break;
-	default:
-		break;
-	}
+	if(val->type.get)
+		return val->type.get(val, src->base_addr);
+	return 0;
 }
 
 /* Called with rwsem held for reading */
@@ -405,6 +350,7 @@ search_all_simple_values(struct stats_fs_source *src,
 
 		/* must be here */
 		value_found = get_simple_value(src_entry, val);
+
 		agg->sum += value_found;
 		agg->count++;
 		agg->count_zero += (value_found == 0);
@@ -466,31 +412,24 @@ static void init_aggregate_value(struct stats_fs_aggregate_value *agg,
 static void store_final_value(struct stats_fs_aggregate_value *agg,
 			      struct stats_fs_value *val, uint64_t *ret)
 {
-	int operation;
-
-	operation = val->aggr_kind | is_val_signed(val);
-
-	switch (operation) {
-	case STATS_FS_AVG:
-		*ret = agg->count ? agg->sum / agg->count : 0;
+	switch (val->aggr_kind) {
+	case STATS_FS_AVG:{
+		if(is_val_signed(val))
+			*ret = agg->count ? ((int64_t)agg->sum) / agg->count : 0;
+		else
+			*ret = agg->count ? agg->sum / agg->count : 0;
 		break;
-	case STATS_FS_AVG | STATS_FS_SIGN:
-		*ret = agg->count ? ((int64_t)agg->sum) / agg->count : 0;
-		break;
+	}
 	case STATS_FS_SUM:
-	case STATS_FS_SUM | STATS_FS_SIGN:
 		*ret = agg->sum;
 		break;
 	case STATS_FS_MIN:
-	case STATS_FS_MIN | STATS_FS_SIGN:
 		*ret = agg->min;
 		break;
 	case STATS_FS_MAX:
-	case STATS_FS_MAX | STATS_FS_SIGN:
 		*ret = agg->max;
 		break;
 	case STATS_FS_COUNT_ZERO:
-	case STATS_FS_COUNT_ZERO | STATS_FS_SIGN:
 		*ret = agg->count_zero;
 		break;
 	default:
@@ -564,8 +503,9 @@ static void set_all_simple_values(struct stats_fs_source *src,
 			continue;
 
 		if (src_entry->base_addr &&
-		    src_entry->values == ref_src_entry->values)
-			clear_simple_value(src_entry, val);
+		    src_entry->values == ref_src_entry->values &&
+		    val->type.clear)
+		    	val->type.clear(val, src_entry->base_addr);
 	}
 }
 
@@ -607,8 +547,8 @@ static int stats_fs_source_clear_locked(struct stats_fs_source *source,
 		return -ENOENT;
 	}
 
-	if (src_entry->base_addr != NULL) {
-		clear_simple_value(src_entry, found);
+	if (src_entry->base_addr != NULL && found->type.clear) {
+		found->type.clear(found, src_entry->base_addr);
 		return 0;
 	}
 
