@@ -21,7 +21,8 @@ enum stat_aggr {
 	STATS_FS_AVG,
 };
 
-enum common_flags {
+/* flags used by source and internal source_value structure */
+enum source_value_common_flags {
 	STATS_FS_HIDDEN = 0x1,
 };
 

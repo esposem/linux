@@ -215,7 +215,7 @@ static void test_empty_folder(struct kunit *test)
 {
 	struct stats_fs_source *src;
 
-	src = stats_fs_source_create("kvm_%d", 123);
+	src = stats_fs_source_create(0, "kvm_%d", 123);
 	KUNIT_EXPECT_EQ(test, strcmp(src->name, "kvm_123"), 0);
 	KUNIT_EXPECT_EQ(test, get_number_subsources(src), 0);
 	KUNIT_EXPECT_EQ(test, get_number_values(src), 0);
@@ -227,8 +227,8 @@ static void test_add_subfolder(struct kunit *test)
 {
 	struct stats_fs_source *src, *sub;
 
-	src = stats_fs_source_create("parent");
-	sub = stats_fs_source_create("child");
+	src = stats_fs_source_create(0, "parent");
+	sub = stats_fs_source_create(0, "child");
 	stats_fs_source_add_subordinate(src, sub);
 	KUNIT_EXPECT_EQ(test, source_has_subsource(src, sub), true);
 	KUNIT_EXPECT_EQ(test, get_number_subsources(src), 1);
@@ -239,7 +239,7 @@ static void test_add_subfolder(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, get_total_number_values(src), 0);
 
 	stats_fs_source_put(sub);
-	sub = stats_fs_source_create("not a child");
+	sub = stats_fs_source_create(0, "not a child");
 	KUNIT_EXPECT_EQ(test, source_has_subsource(src, sub), false);
 	KUNIT_EXPECT_EQ(test, get_number_subsources(src), 1);
 
@@ -252,16 +252,16 @@ static void test_add_value(struct kunit *test)
 	struct stats_fs_source *src;
 	int n;
 
-	src = stats_fs_source_create("parent");
+	src = stats_fs_source_create(0, "parent");
 
 	// add values
-	n = stats_fs_source_add_values(src, test_values, &cont);
+	n = stats_fs_source_add_values(src, test_values, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_values_with_base(src, &cont);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_values));
 
 	// add same values, nothing happens
-	n = stats_fs_source_add_values(src, test_values, &cont);
+	n = stats_fs_source_add_values(src, test_values, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, -EEXIST);
 	n = get_number_values_with_base(src, &cont);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_values));
@@ -283,14 +283,14 @@ static void test_add_value_in_subfolder(struct kunit *test)
 	struct stats_fs_source *src, *sub, *sub_not;
 	int n;
 
-	src = stats_fs_source_create("parent");
-	sub = stats_fs_source_create("child");
+	src = stats_fs_source_create(0, "parent");
+	sub = stats_fs_source_create(0, "child");
 
 	// src -> sub
 	stats_fs_source_add_subordinate(src, sub);
 
 	// add values
-	n = stats_fs_source_add_values(sub, test_values, &cont);
+	n = stats_fs_source_add_values(sub, test_values, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_values_with_base(sub, &cont);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_values));
@@ -304,10 +304,10 @@ static void test_add_value_in_subfolder(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, get_number_aggregates(sub), 0);
 
 	// different folder
-	sub_not = stats_fs_source_create("not a child");
+	sub_not = stats_fs_source_create(0, "not a child");
 
 	// add values
-	n = stats_fs_source_add_values(sub_not, test_values, &cont);
+	n = stats_fs_source_add_values(sub_not, test_values, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_values_with_base(sub_not, &cont);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_values));
@@ -345,10 +345,10 @@ static void test_search_value(struct kunit *test)
 	uint64_t ret;
 	int n;
 
-	src = stats_fs_source_create("parent");
+	src = stats_fs_source_create(0, "parent");
 
 	// add values
-	n = stats_fs_source_add_values(src, test_values, &cont);
+	n = stats_fs_source_add_values(src, test_values, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_values_with_base(src, &cont);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_values));
@@ -380,14 +380,14 @@ static void test_search_value_in_subfolder(struct kunit *test)
 	uint64_t ret;
 	int n;
 
-	src = stats_fs_source_create("parent");
-	sub = stats_fs_source_create("child");
+	src = stats_fs_source_create(0, "parent");
+	sub = stats_fs_source_create(0, "child");
 
 	// src -> sub
 	stats_fs_source_add_subordinate(src, sub);
 
 	// add values to sub
-	n = stats_fs_source_add_values(sub, test_values, &cont);
+	n = stats_fs_source_add_values(sub, test_values, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_values_with_base(sub, &cont);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_values));
@@ -430,7 +430,7 @@ static void test_search_value_in_empty_folder(struct kunit *test)
 	uint64_t ret;
 	int n;
 
-	src = stats_fs_source_create("empty folder");
+	src = stats_fs_source_create(0, "empty folder");
 	KUNIT_EXPECT_EQ(test, get_number_aggregates(src), 0);
 	KUNIT_EXPECT_EQ(test, get_number_subsources(src), 0);
 	KUNIT_EXPECT_EQ(test, get_number_values(src), 0);
@@ -459,10 +459,10 @@ static void test_add_aggregate(struct kunit *test)
 	struct stats_fs_source *src;
 	int n;
 
-	src = stats_fs_source_create("parent");
+	src = stats_fs_source_create(0, "parent");
 
 	// add aggr to src, no values
-	n = stats_fs_source_add_values(src, test_aggr, NULL);
+	n = stats_fs_source_add_values(src, test_aggr, NULL, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_values_with_base(src, NULL);
 	KUNIT_EXPECT_EQ(test, n, 0);
@@ -472,7 +472,7 @@ static void test_add_aggregate(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_aggr));
 
 	// add same array again, should not be added
-	n = stats_fs_source_add_values(src, test_aggr, NULL);
+	n = stats_fs_source_add_values(src, test_aggr, NULL, 0);
 	KUNIT_EXPECT_EQ(test, n, -EEXIST);
 	n = get_number_aggr_with_base(src, NULL);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_aggr));
@@ -488,13 +488,13 @@ static void test_add_aggregate_in_subfolder(struct kunit *test)
 	struct stats_fs_source *src, *sub, *sub_not;
 	int n;
 
-	src = stats_fs_source_create("parent");
-	sub = stats_fs_source_create("child");
+	src = stats_fs_source_create(0, "parent");
+	sub = stats_fs_source_create(0, "child");
 	// src->sub
 	stats_fs_source_add_subordinate(src, sub);
 
 	// add aggr to sub
-	n = stats_fs_source_add_values(sub, test_aggr, NULL);
+	n = stats_fs_source_add_values(sub, test_aggr, NULL, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(sub, NULL);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_aggr));
@@ -506,10 +506,10 @@ static void test_add_aggregate_in_subfolder(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, get_number_aggregates(sub), ARR_SIZE(test_aggr));
 
 	// not a child
-	sub_not = stats_fs_source_create("not a child");
+	sub_not = stats_fs_source_create(0, "not a child");
 
 	// add aggr to "not a child"
-	n = stats_fs_source_add_values(sub_not, test_aggr, NULL);
+	n = stats_fs_source_add_values(sub_not, test_aggr, NULL, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(sub_not, NULL);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_aggr));
@@ -542,8 +542,8 @@ static void test_search_aggregate(struct kunit *test)
 	uint64_t ret;
 	int n;
 
-	src = stats_fs_source_create("parent");
-	n = stats_fs_source_add_values(src, test_aggr, NULL);
+	src = stats_fs_source_create(0, "parent");
+	n = stats_fs_source_add_values(src, test_aggr, NULL, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(src, NULL);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_aggr));
@@ -573,12 +573,12 @@ static void test_search_aggregate_in_subfolder(struct kunit *test)
 	uint64_t ret;
 	int n;
 
-	src = stats_fs_source_create("parent");
-	sub = stats_fs_source_create("child");
+	src = stats_fs_source_create(0, "parent");
+	sub = stats_fs_source_create(0, "child");
 
 	stats_fs_source_add_subordinate(src, sub);
 
-	n = stats_fs_source_add_values(sub, test_aggr, NULL);
+	n = stats_fs_source_add_values(sub, test_aggr, NULL, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(sub, NULL);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_aggr));
@@ -624,15 +624,15 @@ void test_search_same(struct kunit *test)
 	uint64_t ret;
 	int n;
 
-	src = stats_fs_source_create("parent");
-	n = stats_fs_source_add_values(src, test_same_name, &cont);
+	src = stats_fs_source_create(0, "parent");
+	n = stats_fs_source_add_values(src, test_same_name, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_values_with_base(src, &cont);
 	KUNIT_EXPECT_EQ(test, n, 1);
 	n = get_number_aggr_with_base(src, &cont);
 	KUNIT_EXPECT_EQ(test, n, 1);
 
-	n = stats_fs_source_add_values(src, test_same_name, &cont);
+	n = stats_fs_source_add_values(src, test_same_name, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, -EEXIST);
 	n = get_number_values_with_base(src, &cont);
 	KUNIT_EXPECT_EQ(test, n, 1);
@@ -652,22 +652,22 @@ static void test_add_mixed(struct kunit *test)
 	struct stats_fs_source *src;
 	int n;
 
-	src = stats_fs_source_create("parent");
+	src = stats_fs_source_create(0, "parent");
 
-	n = stats_fs_source_add_values(src, test_aggr, NULL);
+	n = stats_fs_source_add_values(src, test_aggr, NULL, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_values_with_base(src, NULL);
 	KUNIT_EXPECT_EQ(test, n, 0);
-	n = stats_fs_source_add_values(src, test_values, &cont);
+	n = stats_fs_source_add_values(src, test_values, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(src, NULL);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_aggr));
 
-	n = stats_fs_source_add_values(src, test_values, &cont);
+	n = stats_fs_source_add_values(src, test_values, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, -EEXIST);
 	n = get_number_values_with_base(src, &cont);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_values));
-	n = stats_fs_source_add_values(src, test_aggr, NULL);
+	n = stats_fs_source_add_values(src, test_aggr, NULL, 0);
 	KUNIT_EXPECT_EQ(test, n, -EEXIST);
 	n = get_number_aggr_with_base(src, NULL);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_aggr));
@@ -683,16 +683,16 @@ static void test_search_mixed(struct kunit *test)
 	uint64_t ret;
 	int n;
 
-	src = stats_fs_source_create("parent");
-	sub = stats_fs_source_create("child");
+	src = stats_fs_source_create(0, "parent");
+	sub = stats_fs_source_create(0, "child");
 	stats_fs_source_add_subordinate(src, sub);
 
 	// src has the aggregates, sub the values. Just search
-	n = stats_fs_source_add_values(sub, test_values, &cont);
+	n = stats_fs_source_add_values(sub, test_values, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_values_with_base(sub, &cont);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_values));
-	n = stats_fs_source_add_values(src, test_aggr, &cont);
+	n = stats_fs_source_add_values(src, test_aggr, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(src, &cont);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_aggr));
@@ -738,22 +738,22 @@ static void test_all_aggregations_agg_val_val(struct kunit *test)
 	uint64_t ret;
 	int n;
 
-	src = stats_fs_source_create("parent");
-	sub1 = stats_fs_source_create("child1");
-	sub2 = stats_fs_source_create("child2");
+	src = stats_fs_source_create(0, "parent");
+	sub1 = stats_fs_source_create(0, "child1");
+	sub2 = stats_fs_source_create(0, "child2");
 	stats_fs_source_add_subordinate(src, sub1);
 	stats_fs_source_add_subordinate(src, sub2);
 
-	n = stats_fs_source_add_values(sub1, test_all_aggr, &cont);
+	n = stats_fs_source_add_values(sub1, test_all_aggr, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(sub1, &cont);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_all_aggr));
-	n = stats_fs_source_add_values(sub2, test_all_aggr, &cont2);
+	n = stats_fs_source_add_values(sub2, test_all_aggr, &cont2, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(sub2, &cont2);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_all_aggr));
 
-	n = stats_fs_source_add_values(src, test_all_aggr, NULL);
+	n = stats_fs_source_add_values(src, test_all_aggr, NULL, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(src, NULL);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_all_aggr));
@@ -794,22 +794,22 @@ static void test_all_aggregations_val_agg_val(struct kunit *test)
 	uint64_t ret;
 	int n;
 
-	src = stats_fs_source_create("parent");
-	sub1 = stats_fs_source_create("child1");
-	sub2 = stats_fs_source_create("child2");
+	src = stats_fs_source_create(0, "parent");
+	sub1 = stats_fs_source_create(0, "child1");
+	sub2 = stats_fs_source_create(0, "child2");
 	stats_fs_source_add_subordinate(src, sub1);
 	stats_fs_source_add_subordinate(src, sub2);
 
-	n = stats_fs_source_add_values(src, test_all_aggr, &cont);
+	n = stats_fs_source_add_values(src, test_all_aggr, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(src, &cont);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_all_aggr));
-	n = stats_fs_source_add_values(sub2, test_all_aggr, &cont2);
+	n = stats_fs_source_add_values(sub2, test_all_aggr, &cont2, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(sub2, &cont2);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_all_aggr));
 
-	n = stats_fs_source_add_values(sub1, test_all_aggr, NULL);
+	n = stats_fs_source_add_values(sub1, test_all_aggr, NULL, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(sub1, NULL);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_all_aggr));
@@ -875,17 +875,17 @@ static void test_all_aggregations_agg_val_val_sub(struct kunit *test)
 	uint64_t ret;
 	int n;
 
-	src = stats_fs_source_create("parent");
-	sub1 = stats_fs_source_create("child1");
-	sub11 = stats_fs_source_create("child11");
+	src = stats_fs_source_create(0, "parent");
+	sub1 = stats_fs_source_create(0, "child1");
+	sub11 = stats_fs_source_create(0, "child11");
 	stats_fs_source_add_subordinate(src, sub1);
 	stats_fs_source_add_subordinate(sub1, sub11); // changes here!
 
-	n = stats_fs_source_add_values(sub1, test_values, &cont);
+	n = stats_fs_source_add_values(sub1, test_values, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_values_with_base(sub1, &cont);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_values));
-	n = stats_fs_source_add_values(sub11, test_values, &cont2);
+	n = stats_fs_source_add_values(sub11, test_values, &cont2, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_values_with_base(sub11, &cont2);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_values));
@@ -893,16 +893,16 @@ static void test_all_aggregations_agg_val_val_sub(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, get_total_number_values(src),
 			ARR_SIZE(test_values) * 2);
 
-	n = stats_fs_source_add_values(sub1, test_all_aggr, &cont);
+	n = stats_fs_source_add_values(sub1, test_all_aggr, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(sub1, &cont);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_all_aggr));
-	n = stats_fs_source_add_values(sub11, test_all_aggr, &cont2);
+	n = stats_fs_source_add_values(sub11, test_all_aggr, &cont2, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(sub11, &cont2);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_all_aggr));
 
-	n = stats_fs_source_add_values(src, test_all_aggr, NULL);
+	n = stats_fs_source_add_values(src, test_all_aggr, NULL, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(src, NULL);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_all_aggr));
@@ -943,20 +943,20 @@ static void test_all_aggregations_agg_no_val_sub(struct kunit *test)
 	uint64_t ret;
 	int n;
 
-	src = stats_fs_source_create("parent");
-	sub1 = stats_fs_source_create("child1");
-	sub11 = stats_fs_source_create("child11");
+	src = stats_fs_source_create(0, "parent");
+	sub1 = stats_fs_source_create(0, "child1");
+	sub11 = stats_fs_source_create(0, "child11");
 	stats_fs_source_add_subordinate(src, sub1);
 	stats_fs_source_add_subordinate(sub1, sub11);
 
-	n = stats_fs_source_add_values(sub11, test_all_aggr, &cont2);
+	n = stats_fs_source_add_values(sub11, test_all_aggr, &cont2, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(sub11, &cont2);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_all_aggr));
 
 	KUNIT_EXPECT_EQ(test, get_total_number_values(src), 0);
 
-	n = stats_fs_source_add_values(src, test_all_aggr, NULL);
+	n = stats_fs_source_add_values(src, test_all_aggr, NULL, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(src, NULL);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_all_aggr));
@@ -997,32 +997,32 @@ static void test_all_aggregations_agg_agg_val_sub(struct kunit *test)
 	uint64_t ret;
 	int n;
 
-	src = stats_fs_source_create("parent");
-	sub1 = stats_fs_source_create("child1");
-	sub11 = stats_fs_source_create("child11");
-	sub12 = stats_fs_source_create("child12");
+	src = stats_fs_source_create(0, "parent");
+	sub1 = stats_fs_source_create(0, "child1");
+	sub11 = stats_fs_source_create(0, "child11");
+	sub12 = stats_fs_source_create(0, "child12");
 	stats_fs_source_add_subordinate(src, sub1);
 	stats_fs_source_add_subordinate(sub1, sub11);
 	stats_fs_source_add_subordinate(sub1, sub12);
 
-	n = stats_fs_source_add_values(sub11, test_all_aggr, &cont2);
+	n = stats_fs_source_add_values(sub11, test_all_aggr, &cont2, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(sub11, &cont2);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_all_aggr));
 
-	n = stats_fs_source_add_values(sub12, test_all_aggr, &cont);
+	n = stats_fs_source_add_values(sub12, test_all_aggr, &cont, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(sub12, &cont);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_all_aggr));
 
 	KUNIT_EXPECT_EQ(test, get_total_number_values(src), 0);
 
-	n = stats_fs_source_add_values(src, test_all_aggr, NULL);
+	n = stats_fs_source_add_values(src, test_all_aggr, NULL, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(src, NULL);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_all_aggr));
 
-	n = stats_fs_source_add_values(sub1, test_all_aggr, NULL);
+	n = stats_fs_source_add_values(sub1, test_all_aggr, NULL, 0);
 	KUNIT_EXPECT_EQ(test, n, 0);
 	n = get_number_aggr_with_base(sub1, NULL);
 	KUNIT_EXPECT_EQ(test, n, ARR_SIZE(test_all_aggr));
