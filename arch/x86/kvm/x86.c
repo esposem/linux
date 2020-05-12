@@ -230,8 +230,9 @@ struct stats_fs_value stats_fs_vm_entries[] = {
 	VM_STAT("mmu_cache_miss", mmu_cache_miss),
 	VM_STAT("mmu_unsync", mmu_unsync),
 	VM_STAT("remote_tlb_flush", remote_tlb_flush),
-	VM_STAT("largepages", lpages, .mode = 0444),
-	VM_STAT("nx_largepages_splitted", nx_lpage_splits, .mode = 0444),
+	VM_STAT("largepages", lpages, .value_flag = STATS_FS_FLOATING_VALUE),
+	VM_STAT("nx_largepages_splitted", nx_lpage_splits,
+		.value_flag = STATS_FS_FLOATING_VALUE),
 	VM_STAT("max_mmu_page_hash_collisions", max_mmu_page_hash_collisions),
 	{ NULL }
 };

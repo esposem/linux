@@ -70,8 +70,10 @@ struct stats_fs_value stats_fs_vcpu_entries[] = {
 };
 
 struct stats_fs_value stats_fs_vm_entries[] = {
-	VM_STAT("largepages_2M", num_2M_pages, .mode = 0444),
-	VM_STAT("largepages_1G", num_1G_pages, .mode = 0444),
+	VM_STAT("largepages_2M", num_2M_pages,
+		.value_flag = STATS_FS_FLOATING_VALUE),
+	VM_STAT("largepages_1G", num_1G_pages,
+		.value_flag = STATS_FS_FLOATING_VALUE),
 	{ NULL }
 };
 
