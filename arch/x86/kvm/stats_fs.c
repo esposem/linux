@@ -39,19 +39,19 @@ struct stats_fs_value stats_fs_vcpu_arch_tsc_frac[] = {
 void kvm_arch_create_vcpu_stats_fs(struct kvm_vcpu *vcpu)
 {
 	stats_fs_source_add_values(vcpu->stats_fs_src, stats_fs_vcpu_tsc_offset,
-				   &vcpu->arch);
+				   &vcpu->arch, 0);
 
 	if (lapic_in_kernel(vcpu))
 		stats_fs_source_add_values(vcpu->stats_fs_src,
 					   stats_fs_vcpu_arch_lapic_timer,
-					   &vcpu->arch.apic->lapic_timer);
+					   &vcpu->arch.apic->lapic_timer, 0);
 
 	if (kvm_has_tsc_control) {
 		stats_fs_source_add_values(vcpu->stats_fs_src,
 					   stats_fs_vcpu_arch_tsc_ratio,
-					   &vcpu->arch);
+					   &vcpu->arch, 0);
 		stats_fs_source_add_values(vcpu->stats_fs_src,
 					   stats_fs_vcpu_arch_tsc_frac,
-					   &kvm_tsc_scaling_ratio_frac_bits);
+					   &kvm_tsc_scaling_ratio_frac_bits, 0);
 	}
 }
