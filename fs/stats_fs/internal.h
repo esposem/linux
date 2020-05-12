@@ -11,6 +11,7 @@
 struct stats_fs_value_source {
 	void *base_addr;
 	bool files_created;
+	uint32_t common_flags;
 	struct stats_fs_value *values;
 	struct list_head list_element;
 };

@@ -21,6 +21,10 @@ enum stat_aggr {
 	STATS_FS_AVG,
 };
 
+enum common_flags {
+	STATS_FS_HIDDEN = 0x1,
+};
+
 struct stats_fs_value;
 
 struct stats_fs_type {
@@ -50,6 +54,8 @@ struct stats_fs_source {
 	struct kref refcount;
 
 	char *name;
+
+	uint32_t common_flags;
 
 	/* list of source stats_fs_value_source*/
 	struct list_head values_head;
@@ -107,6 +113,7 @@ extern struct stats_fs_type stats_fs_type_bool;
 
 /**
  * stats_fs_source_create - create a stats_fs_source
+ * @flags: an integer containing all source flags (STATS_FS_HIDDEN, ...)
  * @fmt: source name format
  *
  * Creates a stats_fs_source with the given name. This
@@ -119,7 +126,8 @@ extern struct stats_fs_type stats_fs_type_bool;
  * function when the file is to be removed.  If an error occurs,
  * ERR_PTR(-ERROR) will be returned.
  */
-struct stats_fs_source *stats_fs_source_create(const char *fmt, ...);
+struct stats_fs_source *stats_fs_source_create(uint32_t flags, const char *fmt,
+					       ...);
 
 /**
  * stats_fs_source_register - register a source in the stats_fs filesystem
@@ -138,6 +146,7 @@ void stats_fs_source_register(struct stats_fs_source *source);
  * @source: a pointer to the source that will receive the values
  * @val: a pointer to the NULL terminated stats_fs_value array to add
  * @base_ptr: a pointer to the base pointer used by these values
+ * @flags: an integer containing common value flags (STATS_FS_HIDDEN, ...)
  *
  * In addition to adding values to the source, also create the
  * files in the filesystem if the source already is backed up by a directory.
@@ -146,7 +155,8 @@ void stats_fs_source_register(struct stats_fs_source *source);
  * source and have the same base_ptr, -EEXIST is returned.
  */
 int stats_fs_source_add_values(struct stats_fs_source *source,
-			       struct stats_fs_value *val, void *base_ptr);
+			       struct stats_fs_value *val, void *base_ptr,
+			       uint32_t flags);
 
 /**
  * stats_fs_source_add_subordinate - adds a child to the given source
@@ -275,7 +285,8 @@ bool stats_fs_initialized(void);
  * want to duplicate the design decision mistakes of procfs and devfs again.
  */
 
-static inline struct stats_fs_source *stats_fs_source_create(const char *fmt,
+static inline struct stats_fs_source *stats_fs_source_create(uint32_t flags,
+							     const char *fmt,
 							     ...)
 {
 	return ERR_PTR(-ENODEV);
@@ -285,8 +296,8 @@ static inline void stats_fs_source_register(struct stats_fs_source *source)
 { }
 
 static inline int stats_fs_source_add_values(struct stats_fs_source *source,
-					     struct stats_fs_value *val,
-					     void *base_ptr)
+			       		     struct stats_fs_value *val,
+					     void *base_ptr, uint32_t flags);
 {
 	return -ENODEV;
 }

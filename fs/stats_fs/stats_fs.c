@@ -187,7 +187,8 @@ static void stats_fs_create_files_locked(struct stats_fs_source *source)
 		return;
 
 	list_for_each_entry (val_src, &source->values_head, list_element) {
-		if (val_src->files_created)
+		if (val_src->files_created ||
+		    (val_src->common_flags & STATS_FS_HIDDEN))
 			continue;
 
 		for (val = val_src->values; val->name; val++)
@@ -205,7 +206,7 @@ stats_fs_create_files_recursive_locked(struct stats_fs_source *source,
 	struct stats_fs_source *child;
 
 	/* first check values in this folder, since it might be new */
-	if (!source->source_dentry) {
+	if (!source->source_dentry && !(source->common_flags & STATS_FS_HIDDEN)) {
 		source->source_dentry =
 			stats_fs_create_dir(source->name, parent_dentry);
 	}
@@ -234,7 +235,7 @@ void stats_fs_source_register(struct stats_fs_source *source)
 EXPORT_SYMBOL_GPL(stats_fs_source_register);
 
 /* Called with rwsem held for writing */
-static struct stats_fs_value_source *create_value_source(void *base)
+static struct stats_fs_value_source *create_value_source(void *base, uint32_t flags)
 {
 	struct stats_fs_value_source *val_src;
 
@@ -243,13 +244,15 @@ static struct stats_fs_value_source *create_value_source(void *base)
 		return ERR_PTR(-ENOMEM);
 
 	val_src->base_addr = base;
+	val_src->common_flags = flags;
 	INIT_LIST_HEAD(&val_src->list_element);
 
 	return val_src;
 }
 
 int stats_fs_source_add_values(struct stats_fs_source *source,
-			       struct stats_fs_value *stat, void *ptr)
+			       struct stats_fs_value *stat, void *ptr,
+			       uint32_t flags)
 {
 	struct stats_fs_value_source *val_src;
 	struct stats_fs_value_source *entry;
@@ -263,7 +266,7 @@ int stats_fs_source_add_values(struct stats_fs_source *source,
 		}
 	}
 
-	val_src = create_value_source(ptr);
+	val_src = create_value_source(ptr, flags);
 	val_src->values = (struct stats_fs_value *)stat;
 
 	/* add the val_src to the source list */
@@ -680,7 +683,7 @@ void stats_fs_source_put(struct stats_fs_source *source)
 }
 EXPORT_SYMBOL_GPL(stats_fs_source_put);
 
-struct stats_fs_source *stats_fs_source_create(const char *fmt, ...)
+struct stats_fs_source *stats_fs_source_create(uint32_t flags, const char *fmt, ...)
 {
 	va_list ap;
 	char buf[100];
@@ -700,6 +703,8 @@ struct stats_fs_source *stats_fs_source_create(const char *fmt, ...)
 		kfree(ret);
 		return ERR_PTR(-ENOMEM);
 	}
+
+	ret->common_flags = flags;
 
 	kref_init(&ret->refcount);
 	init_rwsem(&ret->rwsem);
