@@ -26,6 +26,10 @@ enum source_value_common_flags {
 	STATS_FS_HIDDEN = 0x1,
 };
 
+enum stat_fs_value_flag {
+	STATS_FS_FLOATING_VALUE = 0x1,
+};
+
 struct stats_fs_value;
 
 struct stats_fs_type {
@@ -47,8 +51,7 @@ struct stats_fs_value {
 	/* Aggregate type: MIN, MAX, SUM,... */
 	enum stat_aggr aggr_kind;
 
-	/* File mode */
-	uint16_t mode;
+	uint32_t value_flag;
 };
 
 struct stats_fs_source {
