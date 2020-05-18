@@ -207,6 +207,135 @@ static struct file_system_type stats_fs_fs_type = {
 };
 MODULE_ALIAS_FS("statsfs");
 
+static int stats_fs_u64_attr_get(void *data, u64 *val)
+{
+	int r = -EFAULT;
+	struct stats_fs_data_inode *val_inode =
+		(struct stats_fs_data_inode *)data;
+
+	r = stats_fs_source_get_value(val_inode->src, val_inode->val, val);
+	return r;
+}
+
+static int stats_fs_u64_attr_clear(void *data, u64 val)
+{
+	int r = -EFAULT;
+	struct stats_fs_data_inode *val_inode =
+		(struct stats_fs_data_inode *)data;
+
+	if (val)
+		return -EINVAL;
+
+	r = stats_fs_source_clear(val_inode->src, val_inode->val);
+	return r;
+}
+
+static int stats_fs_val_get_mode(struct stats_fs_value *val)
+{
+	return (val->value_flag & STATS_FS_FLOATING_VALUE) ? 0444 : 0644;
+}
+
+static int stats_fs_u64_attr_open(struct inode *inode, struct file *file)
+{
+	struct stats_fs_data_inode *val_inode;
+	char *fmt;
+
+	val_inode = (struct stats_fs_data_inode *)inode->i_private;
+
+	/* Inodes hold a  pointer to the source which is not included in the
+	 * refcount, so they files be opened while destroy is running, but
+	 * values are removed (base_addr = NULL) before the source is destroyed.
+	 */
+	if (!kref_get_unless_zero(&val_inode->src->refcount))
+		return -ENOENT;
+
+	if (is_val_signed(val_inode->val))
+		fmt = "%lld\n";
+	else
+		fmt = "%llu\n";
+
+	if (simple_attr_open(inode, file, stats_fs_u64_attr_get,
+			     stats_fs_val_get_mode(val_inode->val) & 0222 ?
+				     stats_fs_u64_attr_clear :
+				     NULL,
+			     fmt)) {
+		stats_fs_source_put(val_inode->src);
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+static ssize_t stats_fs_string_attr_read(struct file *file, char __user *buf,
+					 size_t len, loff_t *ppos)
+{
+        const char *str = file->private_data;
+        size_t size = strlen(str);
+        return simple_read_from_buffer(buf, len, ppos, str, size);
+}
+
+static int file_string_attr_open(struct inode *inode, struct file *file,
+				 char *str)
+{
+        file->private_data = str;
+        return nonseekable_open(inode, file);
+}
+
+static int stats_fs_string_attr_open(struct inode *inode, struct file *file)
+{
+	struct stats_fs_data_inode *val_inode;
+	char *str;
+	u64 val;
+
+	val_inode = (struct stats_fs_data_inode *)inode->i_private;
+
+	WARN_ON(val_inode->val->value_flag & STATS_FS_FLOATING_VALUE);
+
+	/* Inodes hold a  pointer to the source which is not included in the
+	 * refcount, so they files be opened while destroy is running, but
+	 * values are removed (base_addr = NULL) before the source is destroyed.
+	 */
+	if (!kref_get_unless_zero(&val_inode->src->refcount))
+		return -ENOENT;
+
+	stats_fs_source_get_value(val_inode->src, val_inode->val, &val);
+	str = val_inode->val->show(val);
+
+	if (file_string_attr_open(inode, file, str)) {
+		stats_fs_source_put(val_inode->src);
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+static int stats_fs_attr_release(struct inode *inode, struct file *file)
+{
+	struct stats_fs_data_inode *val_inode;
+
+	val_inode = (struct stats_fs_data_inode *)inode->i_private;
+
+	simple_attr_release(inode, file);
+	stats_fs_source_put(val_inode->src);
+
+	return 0;
+}
+
+static const struct file_operations stats_fs_u64_ops = {
+	.owner = THIS_MODULE,
+	.open = stats_fs_u64_attr_open,
+	.release = stats_fs_attr_release,
+	.read = simple_attr_read,
+	.write = simple_attr_write,
+	.llseek = no_llseek,
+};
+
+static const struct file_operations stats_fs_string_ops = {
+	.owner = THIS_MODULE,
+	.open = stats_fs_string_attr_open,
+	.release = stats_fs_attr_release,
+	.read = stats_fs_string_attr_read,
+	.write = simple_attr_write,
+	.llseek = no_llseek,
+};
 
 /**
  * stats_fs_create_file - create a file in the stats_fs filesystem
@@ -248,7 +377,7 @@ struct dentry *stats_fs_create_file(struct stats_fs_value *val, struct stats_fs_
 	if (IS_ERR(dentry))
 		return dentry;
 
-	inode->i_fop = &stats_fs_ops;
+	inode->i_fop = val->show ? &stats_fs_string_ops : &stats_fs_u64_ops;
 
 	return simplefs_finish_dentry(dentry, inode);
 }

@@ -41,89 +41,10 @@ STATS_FS_TYPE_STRUCT(bool)
 
 static void stats_fs_source_remove_files(struct stats_fs_source *src);
 
-static int is_val_signed(struct stats_fs_value *val)
+int is_val_signed(struct stats_fs_value *val)
 {
-	return val->type.sign;
+	return val->type->sign;
 }
-
-static int stats_fs_attr_get(void *data, u64 *val)
-{
-	int r = -EFAULT;
-	struct stats_fs_data_inode *val_inode =
-		(struct stats_fs_data_inode *)data;
-
-	r = stats_fs_source_get_value(val_inode->src, val_inode->val, val);
-	return r;
-}
-
-static int stats_fs_attr_clear(void *data, u64 val)
-{
-	int r = -EFAULT;
-	struct stats_fs_data_inode *val_inode =
-		(struct stats_fs_data_inode *)data;
-
-	if (val)
-		return -EINVAL;
-
-	r = stats_fs_source_clear(val_inode->src, val_inode->val);
-	return r;
-}
-
-int stats_fs_val_get_mode(struct stats_fs_value *val)
-{
-	return (val->value_flag & STATS_FS_FLOATING_VALUE) ? 0444 : 0644;
-}
-
-static int stats_fs_attr_data_open(struct inode *inode, struct file *file)
-{
-	struct stats_fs_data_inode *val_inode;
-	char *fmt;
-
-	val_inode = (struct stats_fs_data_inode *)inode->i_private;
-
-	/* Inodes hold a  pointer to the source which is not included in the
-	 * refcount, so they files be opened while destroy is running, but
-	 * values are removed (base_addr = NULL) before the source is destroyed.
-	 */
-	if (!kref_get_unless_zero(&val_inode->src->refcount))
-		return -ENOENT;
-
-	if (is_val_signed(val_inode->val))
-		fmt = "%lld\n";
-	else
-		fmt = "%llu\n";
-
-	if (simple_attr_open(inode, file, stats_fs_attr_get,
-			     stats_fs_val_get_mode(val_inode->val) & 0222 ?
-				     stats_fs_attr_clear :
-				     NULL,
-			     fmt)) {
-		stats_fs_source_put(val_inode->src);
-		return -ENOMEM;
-	}
-	return 0;
-}
-
-static int stats_fs_attr_release(struct inode *inode, struct file *file)
-{
-	struct stats_fs_data_inode *val_inode;
-
-	val_inode = (struct stats_fs_data_inode *)inode->i_private;
-
-	simple_attr_release(inode, file);
-	stats_fs_source_put(val_inode->src);
-
-	return 0;
-}
-
-const struct file_operations stats_fs_ops = {
-	.owner = THIS_MODULE,
-	.open = stats_fs_attr_data_open,
-	.release = stats_fs_attr_release,
-	.read = simple_attr_read,
-	.write = simple_attr_write,
-	.llseek = no_llseek,
-};
 
 /* Called with rwsem held for writing */
 static void stats_fs_source_remove_files_locked(struct stats_fs_source *src)
@@ -327,8 +248,8 @@ EXPORT_SYMBOL_GPL(stats_fs_source_remove_subordinate);
 static uint64_t get_simple_value(struct stats_fs_value_source *src,
 				 struct stats_fs_value *val)
 {
-	if(val->type.get)
-		return val->type.get(val, src->base_addr);
+	if(val->type->get)
+		return val->type->get(val, src->base_addr);
 	return 0;
 }
 
@@ -507,8 +428,8 @@ static void set_all_simple_values(struct stats_fs_source *src,
 
 		if (src_entry->base_addr &&
 		    src_entry->values == ref_src_entry->values &&
-		    val->type.clear)
-		    	val->type.clear(val, src_entry->base_addr);
+		    val->type->clear)
+		    	val->type->clear(val, src_entry->base_addr);
 	}
 }
 
@@ -550,8 +471,8 @@ static int stats_fs_source_clear_locked(struct stats_fs_source *source,
 		return -ENOENT;
 	}
 
-	if (src_entry->base_addr != NULL && found->type.clear) {
-		found->type.clear(found, src_entry->base_addr);
+	if (src_entry->base_addr != NULL && found->type->clear) {
+		found->type->clear(found, src_entry->base_addr);
 		return 0;
 	}
 

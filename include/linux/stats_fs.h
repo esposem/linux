@@ -52,6 +52,9 @@ struct stats_fs_value {
 	enum stat_aggr aggr_kind;
 
 	uint32_t value_flag;
+
+	/* optional show function */
+	char *(*show)(uint64_t);
 };
 
 struct stats_fs_source {
