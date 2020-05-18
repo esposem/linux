@@ -2959,7 +2959,7 @@ static void kvm_create_vcpu_stats_fs(struct kvm_vcpu *vcpu)
 	stats_fs_source_add_subordinate(vcpu->kvm->stats_fs_src, vcpu->stats_fs_src);
 
 	stats_fs_source_add_values(vcpu->stats_fs_src, stats_fs_vcpu_entries, vcpu,
-				   STATS_FS_HIDDEN);
+				   0);
 
 #ifdef __KVM_HAVE_ARCH_VCPU_STATS_FS
 	kvm_arch_create_vcpu_stats_fs(vcpu);
