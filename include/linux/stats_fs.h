@@ -46,7 +46,7 @@ struct stats_fs_value {
 	int offset;
 
 	/* Type of the stat BOOL,U64,... */
-	struct stats_fs_type *type;
+	const struct stats_fs_type *type;
 
 	/* Aggregate type: MIN, MAX, SUM,... */
 	enum stat_aggr aggr_kind;
@@ -77,6 +77,11 @@ struct stats_fs_source {
 	struct dentry *source_dentry;
 };
 
+static inline int stats_fs_val_get_mode(struct stats_fs_value *val)
+{
+	return (val->value_flag & STATS_FS_FLOATING_VALUE || !val->type->clear) ? 0444 : 0644;
+}
+
 #define STATS_FS_DEFINE_GET(name, type)	         			       \
 	static inline uint64_t stats_fs_get_##name(struct stats_fs_value *val, \
 						   void *base)                 \
@@ -91,32 +96,37 @@ struct stats_fs_source {
 		*((type *)(base + (uintptr_t)val->offset)) = 0;                \
 	}
 
-#define STATS_FS_DEFINE_F_US(len)					       \
+#define STATS_FS_DEFINE_FUNCT_US(len)					       \
 	STATS_FS_DEFINE_GET(u##len, u##len)				       \
 	STATS_FS_DEFINE_GET(s##len, s##len)				       \
 	STATS_FS_DEFINE_SET(len, u##len)
 
-#define STATS_FS_DEFINE_F(len)						       \
-	STATS_FS_DEFINE_GET(len, len)					       \
-	STATS_FS_DEFINE_SET(len, len)
+#define STATS_FS_DEFINE_FUNCT(type)						       \
+	STATS_FS_DEFINE_GET(type, type)					       \
+	STATS_FS_DEFINE_SET(type, type)
 
-STATS_FS_DEFINE_F_US(8)
-STATS_FS_DEFINE_F_US(16)
-STATS_FS_DEFINE_F_US(32)
-STATS_FS_DEFINE_F_US(64)
-STATS_FS_DEFINE_F(bool)
+STATS_FS_DEFINE_FUNCT_US(8)
+STATS_FS_DEFINE_FUNCT_US(16)
+STATS_FS_DEFINE_FUNCT_US(32)
+STATS_FS_DEFINE_FUNCT_US(64)
+STATS_FS_DEFINE_FUNCT(bool)
 
-extern struct stats_fs_type stats_fs_type_u8;
-extern struct stats_fs_type stats_fs_type_s8;
-extern struct stats_fs_type stats_fs_type_u16;
-extern struct stats_fs_type stats_fs_type_s16;
-extern struct stats_fs_type stats_fs_type_u32;
-extern struct stats_fs_type stats_fs_type_s32;
-extern struct stats_fs_type stats_fs_type_u64;
-extern struct stats_fs_type stats_fs_type_s64;
-extern struct stats_fs_type stats_fs_type_bool;
+#undef STATS_FS_DEFINE_FUNCT
+#undef STATS_FS_DEFINE_FUNCT_US
+#undef STATS_FS_DEFINE_GET
+#undef STATS_FS_DEFINE_SET
 
-#if defined(CONFIG_STATS_FS)
+#if defined(CONFIG_STATS_FS_API)
+
+extern const struct stats_fs_type stats_fs_type_u8;
+extern const struct stats_fs_type stats_fs_type_s8;
+extern const struct stats_fs_type stats_fs_type_u16;
+extern const struct stats_fs_type stats_fs_type_s16;
+extern const struct stats_fs_type stats_fs_type_u32;
+extern const struct stats_fs_type stats_fs_type_s32;
+extern const struct stats_fs_type stats_fs_type_u64;
+extern const struct stats_fs_type stats_fs_type_s64;
+extern const struct stats_fs_type stats_fs_type_bool;
 
 /**
  * stats_fs_source_create - create a stats_fs_source
@@ -285,6 +295,18 @@ bool stats_fs_initialized(void);
 #else
 
 #include <linux/err.h>
+
+#define stats_fs_type_u8 stats_fs_type_stub
+#define stats_fs_type_s8 stats_fs_type_stub
+#define stats_fs_type_u16 stats_fs_type_stub
+#define stats_fs_type_s16 stats_fs_type_stub
+#define stats_fs_type_u32 stats_fs_type_stub
+#define stats_fs_type_s32 stats_fs_type_stub
+#define stats_fs_type_u64 stats_fs_type_stub
+#define stats_fs_type_s64 stats_fs_type_stub
+#define stats_fs_type_bool stats_fs_type_stub
+
+extern const struct stats_fs_type stats_fs_type_stub;
 
 /*
  * We do not return NULL from these functions if CONFIG_STATS_FS is not enabled

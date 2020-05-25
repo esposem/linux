@@ -230,11 +230,6 @@ static int stats_fs_u64_attr_clear(void *data, u64 val)
 	return r;
 }
 
-static int stats_fs_val_get_mode(struct stats_fs_value *val)
-{
-	return (val->value_flag & STATS_FS_FLOATING_VALUE) ? 0444 : 0644;
-}
-
 static int stats_fs_u64_attr_open(struct inode *inode, struct file *file)
 {
 	struct stats_fs_data_inode *val_inode;

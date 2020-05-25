@@ -18,7 +18,7 @@ struct stats_fs_aggregate_value {
 };
 
 #define STATS_FS_DEFINE_TYPE_STRUCT(gtype, stype, si)                          \
-	struct stats_fs_type stats_fs_type_##gtype =			       \
+	const struct stats_fs_type stats_fs_type_##gtype =		       \
 		{                                                              \
 			.get = stats_fs_get_##gtype,			       \
 			.clear = stats_fs_set_##stype,      		       \
@@ -471,7 +471,10 @@ static int stats_fs_source_clear_locked(struct stats_fs_source *source,
 		return -ENOENT;
 	}
 
-	if (src_entry->base_addr != NULL && found->type->clear) {
+	if (!(stats_fs_val_get_mode(val) & 0222))
+		return -EPERM;
+
+	if (src_entry->base_addr != NULL) {
 		found->type->clear(found, src_entry->base_addr);
 		return 0;
 	}
