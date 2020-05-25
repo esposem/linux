@@ -81,12 +81,12 @@ static const char * const tracefs__known_mountpoints[] = {
 };
 
 #ifndef STATSFS_DEFAULT_PATH
-#define STATSFS_DEFAULT_PATH "/sys/kernel/statsfs"
+#define STATSFS_DEFAULT_PATH "/sys/kernel/stats"
 #endif
 
 static const char * const statsfs__known_mountpoints[] = {
 	STATSFS_DEFAULT_PATH,
-	"/statsfs",
+	"/stats",
 	0,
 };
 

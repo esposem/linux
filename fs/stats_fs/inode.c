@@ -451,13 +451,13 @@ static int __init stats_fs_init(void)
 {
 	int retval;
 
-	retval = sysfs_create_mount_point(kernel_kobj, "statsfs");
+	retval = sysfs_create_mount_point(kernel_kobj, "stats");
 	if (retval)
 		return retval;
 
 	retval = register_filesystem(&stats_fs_fs_type);
 	if (retval)
-		sysfs_remove_mount_point(kernel_kobj, "statsfs");
+		sysfs_remove_mount_point(kernel_kobj, "stats");
 	else
 		stats_fs_registered = true;
 

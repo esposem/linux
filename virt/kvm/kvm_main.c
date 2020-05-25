@@ -4328,7 +4328,7 @@ static void kvm_init_stats_fs(void)
 {
 	kvm_stats_fs_dir = stats_fs_source_create(0, "kvm");
 	/* symlink to debugfs */
-	debugfs_create_symlink("kvm", NULL, "/sys/kernel/statsfs/kvm");
+	debugfs_create_symlink("kvm", NULL, "/sys/kernel/stats/kvm");
 	stats_fs_source_register(kvm_stats_fs_dir);
 
 	stats_fs_source_add_values(kvm_stats_fs_dir, stats_fs_vcpu_entries, NULL, 0);

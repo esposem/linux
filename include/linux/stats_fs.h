@@ -140,7 +140,7 @@ struct stats_fs_source *stats_fs_source_create(uint32_t flags, const char *fmt,
  * stats_fs_source_register - register a source in the stats_fs filesystem
  * @source: a pointer to the source that will be registered
  *
- * Add the given folder as direct child of /sys/kernel/statsfs.
+ * Add the given folder as direct child of /sys/kernel/stats.
  * It also starts to recursively search its own child and create all folders
  * and files if they weren't already. All subsequent add_subordinate calls
  * on the same source that is used in this function will create corresponding
